@@ -12,6 +12,8 @@
 #include "kv_store.h"
 #include "kraken2_data.h"
 #include "utilities.h"
+#include <chrono>   // For time measurement
+#include <iomanip>  // For std::put_time
 
 using std::string;
 using std::map;
@@ -26,6 +28,7 @@ using std::ofstream;
 using namespace kraken2;
 
 #define DEFAULT_BLOCK_SIZE (10 * 1024 * 1024)  // 10 MB
+#define DEFAULT_UPDATE_INTERVAL (1) // 1 minute
 
 struct Options {
   string ID_to_taxon_map_filename;
@@ -42,6 +45,7 @@ struct Options {
   uint64_t spaced_seed_mask;
   uint64_t toggle_mask;
   uint64_t min_clear_hash_value;
+  int update_interval;
 };
 
 void ParseCommandLine(int argc, char **argv, Options &opts);
@@ -69,6 +73,7 @@ int main(int argc, char **argv) {
   opts.block_size = DEFAULT_BLOCK_SIZE;
   opts.min_clear_hash_value = 0;
   opts.maximum_capacity = 0;
+  opts.update_interval = DEFAULT_UPDATE_INTERVAL;
   ParseCommandLine(argc, argv, opts);
 
   omp_set_num_threads( opts.num_threads );
@@ -129,6 +134,14 @@ void ProcessSequences(Options &opts, map<string, uint64_t> &ID_to_taxon_map,
   size_t processed_seq_ct = 0;
   size_t processed_ch_ct = 0;
 
+  // Variables to track time and processing rate
+  auto last_update_time = std::chrono::steady_clock::now();
+  size_t last_seq_ct = 0;
+  size_t last_ch_ct = 0;
+
+  // Print block size used (temporary)
+  std::cerr << "Using block size: " << opts.block_size << " bytes." << std::endl;
+  
   #pragma omp parallel
   {
     Sequence sequence;
@@ -165,9 +178,42 @@ void ProcessSequences(Options &opts, map<string, uint64_t> &ID_to_taxon_map,
           processed_ch_ct += sequence.seq.size();
         }
       }
-      if (isatty(fileno(stderr))) {
-        #pragma omp critical(status_update)
-        std::cerr << "\rProcessed " << processed_seq_ct << " sequences (" << processed_ch_ct << " " << (opts.input_is_protein ? "aa" : "bp") << ")...";
+
+      #pragma omp critical(status_update)
+      {
+        // Get current time
+        auto now = std::chrono::steady_clock::now();
+
+        // Time in minutes since last update was made
+        std::chrono::duration<double> elapsed_seconds = now - last_update_time;
+        double elapsed_minutes = elapsed_seconds.count() / 60.0;
+
+        // Test if it's time to print a status update
+        if (elapsed_minutes >= opts.update_interval) {
+
+            // Calculate sequences and characters processed per minute
+            size_t seq_diff = processed_seq_ct - last_seq_ct;
+            size_t ch_diff = processed_ch_ct - last_ch_ct;
+            double seqs_per_min = seq_diff / elapsed_minutes;
+            double chars_per_min = ch_diff / elapsed_minutes;
+
+            // Update last recorded time, sequence count, and character count
+            last_update_time = now;
+            last_seq_ct = processed_seq_ct;
+            last_ch_ct = processed_ch_ct;
+
+            // Get current time for time stamp (human-readable)
+            auto now_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+      std::tm now_tm = *std::localtime(&now_time_t);  // Convert to tm struct
+
+            // Print status message with time stamp and rates
+            std::cerr << "[" << std::put_time(&now_tm, "%Y-%m-%d %H:%M:%S") << "] Processed "
+                      << processed_seq_ct << " sequences (" << processed_ch_ct
+                      << " " << (opts.input_is_protein ? "aa" : "bp") << ") in total. "
+                      << "Speed since last update (" << elapsed_minutes << " minutes ago): " 
+                      << seqs_per_min << " seq/min, " << chars_per_min
+                      << " bp/min." << std::endl;
+        }
       }
     }
   }
@@ -214,7 +260,7 @@ void ParseCommandLine(int argc, char **argv, Options &opts) {
   int opt;
   long long sig;
 
-  while ((opt = getopt(argc, argv, "?hB:c:H:m:n:o:t:k:l:s:S:T:p:M:X")) != -1) {
+  while ((opt = getopt(argc, argv, "?hB:c:H:m:n:o:t:k:l:s:S:T:p:M:Xi:")) != -1) {
     switch (opt) {
       case 'h' : case '?' :
         usage(0);
@@ -282,6 +328,12 @@ void ParseCommandLine(int argc, char **argv, Options &opts) {
       case 'X' :
         opts.input_is_protein = true;
         break;
+      case 'i' :
+        sig = atoll(optarg);
+        if (sig < 1)
+          errx(EX_USAGE, "must have positive update interval");
+        opts.update_interval = static_cast<int>(sig);
+        break;
     }
   }
 
@@ -328,7 +380,8 @@ void usage(int exit_code) {
        << "  -T BITSTRING  Minimizer toggle mask\n"
        << "  -X            Input seqs. are proteins\n"
        << "  -p INT        Number of threads\n"
-       << "  -B INT        Read block size" << endl;
+       << "  -B INT        Read block size\n"
+       << "  -i INT        Approximate update interval in minutes" << endl;
   exit(exit_code);
 }
 

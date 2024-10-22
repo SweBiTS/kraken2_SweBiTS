@@ -31,6 +31,7 @@ my $DEF_NT_KMER_LEN = 35;
 my $DEF_NT_MINIMIZER_SPACES = 7;
 my $DEF_THREAD_CT = 1;
 my $DEF_LOAD_FACTOR = 0.7;
+my $DEF_UPDATE_INTERVAL = 1;
 
 my @VALID_LIBRARY_TYPES = qw/archaea bacteria plasmid viral plant
                              protozoa fungi human nr nt
@@ -50,6 +51,7 @@ my (
   $use_ftp,
   $skip_maps,
   $load_factor,
+  $update_interval,
 
   $dl_taxonomy,
   $dl_library,
@@ -71,6 +73,7 @@ $is_protein = $ENV{"KRAKEN2_PROTEIN_DB"} || 0;
 $use_ftp = $ENV{"KRAKEN2_USE_FTP"} || 0;
 $skip_maps = $ENV{"KRAKEN2_SKIP_MAPS"} || 0;
 $masking = exists $ENV{"KRAKEN2_MASK_LC"} ? $ENV{"KRAKEN2_MASK_LC"} : 1;
+$update_interval = $ENV{"KRAKEN2_UPDATE_INTERVAL"} || $DEF_UPDATE_INTERVAL;
 
 # variables corresponding to task options
 my @TASK_LIST = (
@@ -98,7 +101,8 @@ GetOptions(
   "use-ftp" => \$use_ftp,
   "skip-maps" => \$skip_maps,
   "load-factor=f" => \$load_factor,
-
+  "update-interval=i" => \$update_interval,
+  
   "download-taxonomy" => \$dl_taxonomy,
   "download-library=s" => \$dl_library,
   "add-to-library=s" => \$add_to_library,
@@ -154,6 +158,9 @@ if ($load_factor <= 0) {
 if ($load_factor > 1) {
   die "Can't have load factor of $load_factor (must be no more than 1.0).\n";
 }
+if ($update_interval < 1) {
+  die "Update interval must be a positive integer larger than 0.\n";
+}
 
 $ENV{"KRAKEN2_DB_NAME"} = $db;
 $ENV{"KRAKEN2_THREAD_CT"} = $threads;
@@ -167,6 +174,7 @@ $ENV{"KRAKEN2_MAX_DB_SIZE"} = defined($max_db_size) ? $max_db_size : "";
 $ENV{"KRAKEN2_USE_FTP"} = $use_ftp ? 1 : "";
 $ENV{"KRAKEN2_SKIP_MAPS"} = $skip_maps ? 1 : "";
 $ENV{"KRAKEN2_LOAD_FACTOR"} = $load_factor;
+$ENV{"KRAKEN2_UPDATE_INTERVAL"} = $update_interval;
 
 if ($dl_taxonomy) {
   download_taxonomy();
@@ -246,6 +254,10 @@ Options:
   --load-factor FRAC         Proportion of the hash table to be populated
                              (build task only; def: $DEF_LOAD_FACTOR, must be
                              between 0 and 1).
+  --update-interval INT      Approximate update interval in minutes. Prints 
+                             information about how many sequences and basepairs
+                             have been processed. Default value 1. Used with 
+                             --build option.
 EOF
   exit $exit_code;
 }
