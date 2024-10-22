@@ -149,8 +149,8 @@ void ProcessSequences(Options &opts, map<string, uint64_t> &ID_to_taxon_map,
         auto all_sequence_ids = ExtractNCBISequenceIDs(sequence.header);
         uint64_t taxid = 0;
         for (auto &seqid : all_sequence_ids) {
-          if (ID_to_taxon_map.count(seqid) == 0) continue;
-          auto ext_taxid = ID_to_taxon_map[seqid];
+          if (ID_to_taxon_map.count(seqid) == 0 || ID_to_taxon_map.at(seqid) == 0) continue;
+          auto ext_taxid = ID_to_taxon_map.at(seqid);
           taxid = taxonomy.LowestCommonAncestor(taxid, taxonomy.GetInternalID(ext_taxid));
         }
         if (taxid) {

@@ -9,6 +9,7 @@
 ### Fixed
 - Modified build code to prevent insertion of minimizers with ambiguous bases
 - Runaway memory usage bug with unpaired classification (thanks to D. Cameron)
+- Bug that caused infinite loop when sequences had taxid 0 (thanks to R. Charles)
 
 ## [2.0.9] - 2020-04-07 (beta)
 
