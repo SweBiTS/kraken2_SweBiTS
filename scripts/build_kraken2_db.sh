@@ -116,6 +116,12 @@ fi
 
 echo "Estimated hash table requirement: $(( required_capacity * 4 )) bytes"
 
+if [ -n "$KRAKEN2_ONLY_ESTIMATE" ]
+then
+  echo "You set the \"--only-estimate\" flag, therefore only performing CHT size estimation (completed). Exiting..."
+  exit 0
+fi
+
 if [ -n "$KRAKEN2_MAX_DB_SIZE" ]
 then
   if (( KRAKEN2_MAX_DB_SIZE < (required_capacity * 4) ))
