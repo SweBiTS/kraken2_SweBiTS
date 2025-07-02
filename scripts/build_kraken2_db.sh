@@ -105,15 +105,16 @@ else
   step_time=$(get_current_time)
 
   # Pipe files to estimate_capacity and print update statements
-  list_sequence_files |
-  while IFS= read -r -d $'\0' file; do
-    # Print progress message to stderr
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Processing: $(basename "$file")" >&2
-    
-    # Cat file content to stdout, which is piped to the next command
-    cat "$file"
-  done | estimate_capacity -k $KRAKEN2_KMER_LEN -l $KRAKEN2_MINIMIZER_LEN -S $KRAKEN2_SEED_TEMPLATE -p $KRAKEN2_THREAD_CT $KRAKEN2XFLAG
-  
+  estimate=$(
+    list_sequence_files |
+    while IFS= read -r -d $'\0' file; do
+      # Print progress message to stderr
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Processing: $(basename "$file")" >&2
+      
+      # Cat file content to stdout, which is piped to the next command
+      cat "$file"
+    done | estimate_capacity -k $KRAKEN2_KMER_LEN -l $KRAKEN2_MINIMIZER_LEN -S $KRAKEN2_SEED_TEMPLATE -p $KRAKEN2_THREAD_CT $KRAKEN2XFLAG
+  )
   # Slight upward adjustment of distinct minimizer estimate to protect
   # against crash w/ small reference sets
   estimate=$(( estimate + 8192 ))
