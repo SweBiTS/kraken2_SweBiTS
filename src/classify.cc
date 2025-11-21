@@ -614,6 +614,10 @@ taxid_t ClassifySequence(Sequence &dna, Sequence &dna2, ostringstream &koss,
   else
     koss << dna.seq.size() << "|" << dna2.seq.size() << "\t";
 
+  // --- danisven custom edit: Print Hit Groups Column ---
+  koss << minimizer_hit_groups << "\t";
+  // --- end custom edit ---
+  
   if (opts.quick_mode) {
     koss << ext_call << ":Q";
   }
